@@ -235,6 +235,7 @@ def suggest_reason():
 def save_error():
     d = request.get_json()
     if not d or 'text' not in d: return {'error':'请提供题目文字'}, 400
+    if not d.get('reference_answer','').strip(): return {'error':'请填写参考答案'}, 400
     eid = add_error(question_text=d['text'], ocr_text=d.get('ocr_text',''), ocr_confidence=d.get('ocr_confidence',0),
         ai_subject=d.get('ai_subject',''), ai_chapter=d.get('ai_chapter',''), ai_topics=d.get('ai_topics',''), ai_difficulty=d.get('ai_difficulty',''),
         subject=d.get('subject',d.get('ai_subject','')), chapter=d.get('chapter',d.get('ai_chapter','')), topics=d.get('topics',d.get('ai_topics','')),

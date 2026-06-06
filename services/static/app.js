@@ -158,6 +158,9 @@ async function showDetail(eid){
  h+='<div class="btn-group"><button class="btn btn-p btn-sm" onclick="startReview('+eid+')">费曼复习</button>';
  h+='<button class="btn btn-g btn-sm" onclick="toggleMaster('+eid+')">'+(r.mastered?'取消掌握':'标记掌握')+'</button>';
  h+='<button class="btn btn-d btn-sm" onclick="deleteErr('+eid+')">删除</button></div>';
+ if(r.reference_answer){
+  h+='<div id="ansToggle-'+eid+'"><button class="btn btn-s btn-sm" onclick="toggleAnswer('+eid+')" style="margin-top:8px">显示答案</button></div>';
+ }
  document.getElementById('detailContent').innerHTML=h;
  document.getElementById('detail').style.display='block';setTimeout(renderMath,100);
 }
@@ -167,7 +170,7 @@ async function startReview(eid){
  if(!r||!r.question_text){toast('题目数据错误','e');return}
  var rev=await(await fetch('/review/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:r.question_text,error_id:eid})})).json();
  sessionId=rev.session_id;
- document.getElementById('detailContent').innerHTML='<div style="margin-top:16px;padding-top:16px;border-top:2px solid var(--b)"><b>费曼复习</b><div id="reviewQ">('+rev.step+'/'+rev.total+') '+rev.question+'</div><textarea id="ans" rows="3" placeholder="输入你的回答..."></textarea><div class="btn-group"><button class="btn btn-p btn-sm" onclick="submitAnswer()">提交</button><button class="btn btn-g btn-sm" onclick="getHint()">提示</button></div></div>';
+ document.getElementById('detailContent').innerHTML+='<div style="margin-top:16px;padding-top:16px;border-top:2px solid var(--b)"><b>费曼复习</b><div style="font-size:12px;color:var(--t2);margin-bottom:8px">'+r.question_text+'</div><div id="reviewQ">('+rev.step+'/'+rev.total+') '+rev.question+'</div><textarea id="ans" rows="3" placeholder="输入你的回答..."></textarea><div class="btn-group"><button class="btn btn-p btn-sm" onclick="submitAnswer()">提交</button><button class="btn btn-g btn-sm" onclick="getHint()">提示</button></div></div>';
  document.getElementById('ans').focus();setTimeout(renderMath,100);
 }
 
@@ -180,6 +183,21 @@ async function submitAnswer(){
 
 async function getHint(){if(!sessionId)return;var r=await(await fetch('/review/hint',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId})})).json();document.getElementById('reviewQ').innerHTML+='<div style="margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:13px;color:var(--p)">'+r.hint+'</div>';setTimeout(renderMath,100);}
 
+async function toggleAnswer(eid){
+ var d=document.getElementById('ansToggle-'+eid);
+ if(!d)return;
+ if(d.dataset.loaded){
+  var p=d.querySelector('.ans-content');
+  if(p)p.style.display=p.style.display==='none'?'block':'none';
+  d.querySelector('button').textContent=p.style.display==='none'?'显示答案':'隐藏答案';
+  return;
+ }
+ var r=await(await fetch('/errors/'+eid)).json();
+ if(!r||!r.reference_answer){d.innerHTML='暂无答案';return}
+ d.innerHTML='<div class="ans-content" style="margin-top:8px;padding:12px;background:var(--bg);border-radius:8px;font-size:14px;line-height:1.7">'+r.reference_answer+'</div><button class="btn btn-s btn-sm" onclick="toggleAnswer('+eid+')" style="margin-top:4px">隐藏答案</button>';
+ d.dataset.loaded='1';
+ setTimeout(renderMath,100);
+}
 async function toggleMaster(eid){await fetch('/errors/'+eid+'/master',{method:'POST'});showDetail(eid);loadErrors();}
 
 async function deleteErr(eid){if(!confirm('确认删除？'))return;await fetch('/errors/'+eid,{method:'DELETE'});document.getElementById('detail').style.display='none';loadErrors();toast('已删除');}
