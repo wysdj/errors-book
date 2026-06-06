@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>408 错题管理器</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="错题本">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/static/katex.min.css">
+<script src="/static/katex.min.js"></script>
+<script src="/static/auto-render.min.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+</head><body>
+<nav class="sidebar">
+ <div class="logo"><span>&#x1f4da;</span>408 错题本</div>
+ <a href="#" class="active" onclick="switchTab('capture',this)">&#x1f4f7; 录入错题</a>
+ <a href="#" onclick="switchTab('list',this)">&#x1f4cb; 错题库</a>
+ <a href="#" onclick="switchTab('stats',this)">&#x1f4ca; 统计分析</a>
+ <div class="divider"></div>
+ <a href="#" onclick="exportCSV()">&#x1f4e5; 导出 CSV</a>
+ <a href="#" onclick="doBackup()">&#x1f4be; 备份</a>
+</nav>
+<main>
+<div id="pageCapture" class="page active">
+ <div class="hero"><h1>录入错题</h1><p>拍照识别或手动输入，AI 帮你自动分类</p></div>
+ <div class="col2">
+  <div class="card">
+   <div class="card-header"><span class="dot dot-p"></span>拍照 / 输入</div>
+   <div style="display:flex;gap:8px;margin-bottom:8px">
+    <select id="domain" onchange="onDomainChange()" style="width:auto;padding:6px 12px">
+     <option value="all">全部学科</option><option value="408">408 计算机</option><option value="math">考研数学</option>
+    </select>
+   </div>
+   <div style="display:flex;gap:8px;margin-bottom:12px">
+    <input type="file" id="img" accept="image/*" style="flex:1">
+    <button class="btn btn-p btn-sm" onclick="doOCR()">识别</button>
+    <button class="btn btn-g btn-sm" onclick="doDescribe()">图片描述</button>
+   </div>
+   <textarea id="txt" rows="5" placeholder="或粘贴题目文字..." oninput="updatePreview()"></textarea>
+   <div id="mathPreview" style="margin-top:8px;padding:12px;background:var(--c);border-radius:12px;min-height:40px;font-size:15px;border:1px dashed var(--b);color:var(--t2);word-break:break-all"></div>
+   <div class="btn-group">
+    <button class="btn btn-p btn-sm" onclick="doClassify()">AI 分类</button>
+    <button class="btn btn-s btn-sm" onclick="doGenerateAnswer()">AI 生成答案</button>
+   </div>
+  </div>
+  <div>
+   <div class="card">
+    <div class="card-header"><span class="dot dot-w"></span>分类信息</div>
+    <div class="col2"><div><label>学科</label><input id="subj" placeholder="数据结构"></div><div><label>难度</label><input id="diff" placeholder="中等"></div></div>
+    <label>章节</label><input id="chap" placeholder="树与二叉树">
+    <label>知识点</label><input id="topics" placeholder="遍历, 二叉树构造">
+    <label>错误原因</label>
+    <div id="reasonTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+     <span class="reason-tag" onclick="toggleReasonTag(this)">概念混淆</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">计算错误</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">审题不清</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">公式记错</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">方法错误</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">遗漏条件</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">粗心大意</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">知识点遗忘</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">思路不清晰</span>
+     <span class="reason-tag" onclick="toggleReasonTag(this)">时间不够</span>
+    </div>
+    <input id="reason" placeholder="补充具体错误原因...">
+   </div>
+   <div class="card">
+    <div class="card-header"><span class="dot dot-s"></span>参考答案</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+     <input type="file" id="ansImg" accept="image/*" style="flex:1">
+     <button class="btn btn-g btn-sm" onclick="doOCRAnswer()">拍照识别答案</button>
+    </div>
+    <textarea id="refAns" rows="5" placeholder="AI 生成后出现在这里，或拍照识别手写答案..."></textarea>
+    <div id="ansPreview" style="margin-top:8px;padding:12px;background:var(--c);border-radius:12px;min-height:40px;font-size:15px;border:1px dashed var(--b);color:var(--t2);word-break:break-all"></div>
+    <button class="btn btn-s btn-full" onclick="doSave()">保存到错题库</button>
+   </div>
+  </div>
+ </div>
+ <div id="result"></div>
+</div>
+<div id="pageList" class="page">
+ <div class="hero"><h1>错题库</h1><p>浏览、搜索、复习你的所有错题</p></div>
+ <div class="card">
+  <div class="row-filter">
+   <div><label>学科</label><select id="fSubj" onchange="onSubjChange()"><option value="">全部</option><optgroup label="408 计算机"><option>数据结构</option><option>计算机组成原理</option><option>操作系统</option><option>计算机网络</option></optgroup><optgroup label="考研数学"><option>高等数学</option><option>线性代数</option><option>概率论与数理统计</option></optgroup></select></div>
+   <div><label>章节</label><select id="fChap" onchange="loadErrors()"><option value="">全部章节</option></select></div>
+   <div><label>状态</label><select id="fMastered" onchange="loadErrors()"><option value="">全部</option><option value="0">未掌握</option><option value="1">已掌握</option></select></div>
+   <div><label>错因</label><select id="fReason" onchange="loadErrors()"><option value="">全部</option><option>概念混淆</option><option>计算错误</option><option>审题不清</option><option>公式记错</option><option>方法错误</option><option>遗漏条件</option><option>粗心大意</option><option>知识点遗忘</option><option>思路不清晰</option><option>时间不够</option></select></div>
+   <div style="flex:2"><label>搜索</label><input id="fSearch" oninput="debounceSearch()" placeholder="输入关键词自动搜索..."></div>
+   <div class="actions"><button class="btn btn-p btn-sm" onclick="loadErrors()">搜索</button></div>
+  </div>
+ </div>
+ <div id="errList"></div>
+ <div id="detail" class="card" style="display:none">
+  <div class="card-header"><span class="dot dot-p"></span>题目详情</div>
+  <div id="detailContent"></div>
+ </div>
+</div>
+<div id="pageStats" class="page">
+ <div class="hero"><h1>统计分析</h1><p>掌握复习进度，定位薄弱环节</p></div>
+ <div class="stat-row" id="statCards"></div>
+ <div class="col2">
+  <div class="card"><div class="card-header"><span class="dot dot-p"></span>学科分布</div><canvas id="chartSubject" height="200"></canvas></div>
+  <div class="card"><div class="card-header"><span class="dot dot-w"></span>薄弱章节 Top 10</div><canvas id="chartWeak" height="200"></canvas></div>
+ </div>
+ <div id="tagCloud" class="card" style="margin-top:20px"><div class="card-header"><span class="dot dot-s"></span>知识点分布</div></div>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/app.js"></script>
+</body></html>

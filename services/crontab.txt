@@ -1,0 +1,1 @@
+0 3 * * * cp /opt/errorbook/errors.db /opt/errorbook/backups/errors_$(date +%Y%m%d).db

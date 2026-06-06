@@ -1,0 +1,10 @@
+.venv39/
+__pycache__/
+*.pyc
+temp/
+backups/
+*.db
+.env
+server.log
+server.pid
+.DS_Store
