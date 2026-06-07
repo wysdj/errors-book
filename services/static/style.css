@@ -122,6 +122,8 @@ input[type="file"]::file-selector-button{padding:7px 16px;border:none;border-rad
  .pagination .pg{min-width:32px;height:32px;font-size:13px}
  #result{max-height:200px;font-size:10px}
  .toast{left:12px;right:12px;bottom:12px;transform:none;text-align:center;font-size:12px}
+ .accordion-header{padding:12px 14px;font-size:13px}
+ .accordion-body{padding:2px 14px 14px;font-size:12px}
 }
 \r\n.reason-tag{display:inline-block;padding:4px 10px;border-radius:14px;font-size:11px;cursor:pointer;border:1px solid var(--b);background:var(--bg);color:var(--t2);transition:all .2s;user-select:none}\r\n.reason-tag.active{background:var(--p);color:#fff;border-color:var(--p)}
 .reason-tag{display:inline-block;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;border:2px solid var(--b);background:var(--bg);color:var(--t2);transition:all .2s;user-select:none;margin:2px}
@@ -129,3 +131,31 @@ input[type="file"]::file-selector-button{padding:7px 16px;border:none;border-rad
 .reason-tag:active{transform:scale(.95)}
 .inline-detail{animation:slideDown .2s ease}
 @keyframes slideDown{from{opacity:0;max-height:0}to{opacity:1;max-height:600px}}
+
+/* 手风琴 */
+.accordion{margin-top:16px;border:1px solid var(--b);border-radius:12px;overflow:hidden}
+.accordion-item{border-bottom:1px solid var(--b)}
+.accordion-item:last-child{border-bottom:none}
+.accordion-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;font-size:14px;font-weight:600;color:var(--t);transition:.15s;user-select:none}
+.accordion-header:hover{background:var(--bg)}
+.accordion-header .acc-arrow{font-size:11px;color:var(--t3);transition:transform .25s ease}
+.accordion-item.active .accordion-header .acc-arrow{transform:rotate(90deg)}
+.accordion-body{display:none;padding:4px 18px 18px;font-size:13px;line-height:1.8;color:var(--t);animation:accOpen .25s ease}
+.accordion-item.active .accordion-body{display:block}
+@keyframes accOpen{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+.review-qcard{background:var(--bg);border-radius:10px;padding:14px;border:1px solid var(--b)}
+.review-qcard textarea{margin-top:8px;min-height:60px;font-size:13px}
+
+/* 内联展开 */
+.err-wrapper{border-bottom:1px solid var(--b)}
+.err-wrapper:last-child{border-bottom:none}
+.err-detail{display:none}
+.err-detail.open{display:block}
+.err-detail-inner{padding:4px 20px 20px 56px;background:linear-gradient(135deg,#fafafe,#eef2ff);animation:slideDown .25s ease}
+.err-detail-inner p{margin:4px 0;font-size:13px;line-height:1.8}
+.err-detail-inner b{font-weight:600}
+.err-detail-inner .btn-group{margin-top:10px}
+@media(max-width:768px){
+ .err-detail-inner{padding:4px 16px 16px 16px}
+}

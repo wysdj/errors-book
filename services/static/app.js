@@ -135,7 +135,7 @@ async function loadErrors(pg){
  var q='subject='+encodeURIComponent(document.getElementById('fSubj').value)+'&mastered='+document.getElementById('fMastered').value+'&chapter='+encodeURIComponent(document.getElementById('fChap').value)+'&reason='+encodeURIComponent(document.getElementById('fReason').value)+'&search='+encodeURIComponent(document.getElementById('fSearch').value)+'&page='+currentPage;
  var r=await(await fetch('/errors?'+q)).json();
  var h='';r.items.forEach(function(e,i){
-  h+='<div class="err-item" onclick="showDetail('+e.id+')"><span class="idx">'+((currentPage-1)*20+i+1)+'</span><div class="info"><div class="title">'+(e.question_text||'无题目')+'</div><div class="meta"><span>'+(e.subject||'?')+'</span><span>&middot;</span><span>'+(e.chapter||'?')+'</span></div></div><span class="badge '+(e.mastered?'badge-m':'badge-p')+'">'+(e.mastered?'已掌握':'未掌握')+'</span></div>';
+  h+='<div class="err-wrapper"><div class="err-item" onclick="toggleDetail('+e.id+')"><span class="idx">'+((currentPage-1)*20+i+1)+'</span><div class="info"><div class="title">'+(e.question_text||'无题目')+'</div><div class="meta"><span>'+(e.subject||'?')+'</span><span>&middot;</span><span>'+(e.chapter||'?')+'</span></div></div><span class="badge '+(e.mastered?'badge-m':'badge-p')+'">'+(e.mastered?'已掌握':'未掌握')+'</span></div><div class="err-detail" id="errDetail-'+e.id+'"></div></div>';
  });
  if(!h)h='<div style="text-align:center;padding:60px;color:var(--t3)"><div style="font-size:48px;margin-bottom:16px">📭</div><div style="font-size:15px;font-weight:500">还没有错题</div><div style="font-size:13px;margin-top:4px">去录入第一道吧</div></div>';
  var pgs='';
@@ -149,20 +149,61 @@ async function loadErrors(pg){
  document.getElementById('errList').innerHTML='<div class="card" style="padding:0;overflow:hidden">'+h+pgs+'</div>';
 }
 
-async function showDetail(eid){
+function toggleAccordion(header){
+ var item=header.parentElement;
+ var accordion=item.parentElement;
+ var isActive=item.classList.contains('active');
+ accordion.querySelectorAll('.accordion-item.active').forEach(function(i){i.classList.remove('active');});
+ if(!isActive)item.classList.add('active');
+}
+
+async function toggleDetail(eid){
+ var detailEl=document.getElementById('errDetail-'+eid);
+ if(!detailEl)return;
+ // 如果已经展开则关闭
+ if(detailEl.classList.contains('open')){
+  detailEl.classList.remove('open');
+  detailEl.innerHTML='';
+  curErrorId=null;
+  return;
+ }
+ // 关闭其他展开的
+ document.querySelectorAll('.err-detail.open').forEach(function(el){
+  el.classList.remove('open');
+  el.innerHTML='';
+ });
+ renderDetailContent(eid, detailEl);
+}
+
+async function renderDetailContent(eid, container){
  var r=await(await fetch('/errors/'+eid)).json();
  if(!r||!r.id){toast('题目不存在','e');return}
  curErrorId=eid;
- var h='<p><b>题目：</b>'+(r.question_text||'')+'</p>';
+ var acc='';
+ if(r.reference_answer){
+  acc+='<div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><span>📝 参考答案</span><span class="acc-arrow">▶</span></div><div class="accordion-body">'+r.reference_answer+'</div></div>';
+ }
+ acc+='<div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><span>🧠 费曼复习</span><span class="acc-arrow">▶</span></div><div class="accordion-body" id="reviewAcc-'+eid+'"><div style="padding:8px 0;color:var(--t3);font-size:13px">点击上方「费曼复习」按钮开始</div></div></div>';
+ var det=[];
+ if(r.topics)det.push('<b>知识点：</b>'+r.topics);
+ if(r.difficulty)det.push('<b>难度：</b>'+r.difficulty);
+ if(r.error_reason)det.push('<b>错误原因：</b>'+r.error_reason);
+ if(r.ocr_confidence)det.push('<b>OCR置信度：</b>'+(r.ocr_confidence*100).toFixed(1)+'%');
+ if(r.image_path)det.push('<b>图片：</b>'+r.image_path);
+ if(det.length){
+  acc+='<div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><span>📋 详细信息</span><span class="acc-arrow">▶</span></div><div class="accordion-body">'+det.join('<br>')+'</div></div>';
+ }
+ var h='<div class="err-detail-inner">';
+ h+='<p><b>题目：</b>'+(r.question_text||'')+'</p>';
  h+='<p><b>分类：</b>'+(r.subject||'?')+' > '+(r.chapter||'?')+'</p>';
  h+='<div class="btn-group"><button class="btn btn-p btn-sm" onclick="startReview('+eid+')">费曼复习</button>';
  h+='<button class="btn btn-g btn-sm" onclick="toggleMaster('+eid+')">'+(r.mastered?'取消掌握':'标记掌握')+'</button>';
  h+='<button class="btn btn-d btn-sm" onclick="deleteErr('+eid+')">删除</button></div>';
- if(r.reference_answer){
-  h+='<div id="ansToggle-'+eid+'"><button class="btn btn-s btn-sm" onclick="toggleAnswer('+eid+')" style="margin-top:8px">显示答案</button></div>';
- }
- document.getElementById('detailContent').innerHTML=h;
- document.getElementById('detail').style.display='block';setTimeout(renderMath,100);
+ h+='<div class="accordion">'+acc+'</div>';
+ h+='</div>';
+ container.innerHTML=h;
+ container.classList.add('open');
+ setTimeout(renderMath,100);
 }
 
 async function startReview(eid){
@@ -170,8 +211,21 @@ async function startReview(eid){
  if(!r||!r.question_text){toast('题目数据错误','e');return}
  var rev=await(await fetch('/review/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:r.question_text,error_id:eid})})).json();
  sessionId=rev.session_id;
- document.getElementById('detailContent').innerHTML+='<div style="margin-top:16px;padding-top:16px;border-top:2px solid var(--b)"><b>费曼复习</b><div style="font-size:12px;color:var(--t2);margin-bottom:8px">'+r.question_text+'</div><div id="reviewQ">('+rev.step+'/'+rev.total+') '+rev.question+'</div><textarea id="ans" rows="3" placeholder="输入你的回答..."></textarea><div class="btn-group"><button class="btn btn-p btn-sm" onclick="submitAnswer()">提交</button><button class="btn btn-g btn-sm" onclick="getHint()">提示</button></div></div>';
- document.getElementById('ans').focus();setTimeout(renderMath,100);
+ var accBody=document.getElementById('reviewAcc-'+eid);
+ if(!accBody)return;
+ accBody.innerHTML='<div class="review-qcard">'+
+  '<div style="font-size:12px;color:var(--t2);margin-bottom:8px">'+r.question_text+'</div>'+
+  '<div id="reviewQ">('+rev.step+'/'+rev.total+') '+rev.question+'</div>'+
+  '<textarea id="ans" rows="3" placeholder="输入你的回答..."></textarea>'+
+  '<div class="btn-group" style="margin-top:8px">'+
+   '<button class="btn btn-p btn-sm" onclick="submitAnswer()">提交</button>'+
+   '<button class="btn btn-g btn-sm" onclick="getHint()">提示</button>'+
+  '</div></div>';
+ // auto open the accordion
+ var accItem=accBody.closest('.accordion-item');
+ if(accItem)accItem.classList.add('active');
+ setTimeout(function(){var el=document.getElementById('ans');if(el)el.focus();},100);
+ setTimeout(renderMath,100);
 }
 
 async function submitAnswer(){
@@ -198,9 +252,22 @@ async function toggleAnswer(eid){
  d.dataset.loaded='1';
  setTimeout(renderMath,100);
 }
-async function toggleMaster(eid){await fetch('/errors/'+eid+'/master',{method:'POST'});showDetail(eid);loadErrors();}
+async function toggleMaster(eid){
+ await fetch('/errors/'+eid+'/master',{method:'POST'});
+ var detailEl=document.getElementById('errDetail-'+eid);
+ if(detailEl&&detailEl.classList.contains('open')){
+  renderDetailContent(eid, detailEl);
+ }
+ loadErrors();
+}
 
-async function deleteErr(eid){if(!confirm('确认删除？'))return;await fetch('/errors/'+eid,{method:'DELETE'});document.getElementById('detail').style.display='none';loadErrors();toast('已删除');}
+async function deleteErr(eid){
+ if(!confirm('确认删除？'))return;
+ await fetch('/errors/'+eid,{method:'DELETE'});
+ var detailEl=document.getElementById('errDetail-'+eid);
+ if(detailEl){detailEl.classList.remove('open');detailEl.innerHTML='';}
+ loadErrors();toast('已删除');
+}
 
 async function exportCSV(){window.open('/export/csv','_blank');toast('CSV已下载');}
 async function doBackup(){window.open('/backup','_blank');toast('备份已下载');}
