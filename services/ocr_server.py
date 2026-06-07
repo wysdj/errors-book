@@ -16,8 +16,8 @@ try:
         encoding='utf-8'
     ))['profiles']['deepseek:default']['key']
 except:
-    _deepseek_key = os.environ.get('DEEPSEEK_KEY', '')
-DEEPSEEK_KEY = _deepseek_key
+    _deepseek_key = os.environ.get('QWEN_KEY', '')
+QWEN_KEY = _deepseek_key
 
 sessions = {}
 SUBJECT_LIST_408 = ['数据结构','计算机组成原理','操作系统','计算机网络']
@@ -25,27 +25,32 @@ SUBJECT_LIST_MATH = ['高等数学','线性代数','概率论与数理统计']
 SUBJECT_LIST = SUBJECT_LIST_408 + SUBJECT_LIST_MATH
 
 def ask_deepseek(prompt, max_tokens=500, temperature=0.3):
-    req = urllib.request.Request('https://api.deepseek.com/v1/chat/completions',
-        data=json.dumps({'model':'deepseek-chat','messages':[{'role':'user','content':prompt}],
+    req = urllib.request.Request('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        data=json.dumps({'model':'qwen-turbo','messages':[{'role':'user','content':prompt}],
         'temperature':temperature,'max_tokens':max_tokens}).encode(),
-        headers={'Authorization':f'Bearer {DEEPSEEK_KEY}','Content-Type':'application/json'})
+        headers={'Authorization':f'Bearer {QWEN_KEY}','Content-Type':'application/json'})
     return json.loads(urllib.request.urlopen(req,timeout=30).read())['choices'][0]['message']['content']
 
 def ask_deepseek_multi(messages, max_tokens=500, temperature=0.3):
-    req = urllib.request.Request('https://api.deepseek.com/v1/chat/completions',
-        data=json.dumps({'model':'deepseek-chat','messages':messages,
+    req = urllib.request.Request('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        data=json.dumps({'model':'qwen-turbo','messages':messages,
         'temperature':temperature,'max_tokens':max_tokens}).encode(),
-        headers={'Authorization':f'Bearer {DEEPSEEK_KEY}','Content-Type':'application/json'})
+        headers={'Authorization':f'Bearer {QWEN_KEY}','Content-Type':'application/json'})
     return json.loads(urllib.request.urlopen(req,timeout=30).read())['choices'][0]['message']['content']
 
 
 def classify_by_ai(text, domain='all'):
+    # 先用免费关键词匹配，命中就直接返回
+    m=retrieve_knowledge(text, top_n=1)
+    if m!='无匹配':
+        parts=m.split(' > ')
+        if len(parts)>=2:
+            return {'subject':parts[0],'chapter':parts[1],'topics':[],'difficulty':'中等'}
+    # 没命中才调 AI
     subjects = SUBJECT_LIST_408 if domain == '408' else (SUBJECT_LIST_MATH if domain == 'math' else SUBJECT_LIST)
-    ctx = retrieve_knowledge(text)
-    prompt = f"""你是考研辅导专家。参考知识库分类，严格返回JSON：
+    prompt = f"""你是考研辅导专家。严格返回JSON：
 {{"subject":"学科","chapter":"章节","topics":["知识点"],"difficulty":"简单/中等/困难"}}
 可选学科：{', '.join(subjects)}
-参考知识库：{ctx}
 题目：{text}"""
     r = ask_deepseek(prompt, max_tokens=300, temperature=0.1)
     s, e = r.find('{'), r.rfind('}')+1
@@ -116,7 +121,7 @@ def describe_image_to_text(img_path):
         img_b64 = base64.b64encode(f.read()).decode()
     req = urllib.request.Request('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
         data=json.dumps({'model':'qwen-vl-plus','messages':[{'role':'user','content':[
-            {'type':'text','text':'请提取图片中的所有题目文字（含选项）。如果有手写笔记只提取印刷体题目，有图表请用文字描述。直接返回题目原文，不要解释。'},
+            {'type':'text','text':'请提取图片中的所有题目文字（含选项）。手写笔记只提取印刷体题目，图表用文字描述。数学公式用(和)包围行内公式，用[和]包围块公式。矩阵用begin{bmatrix}，分数用frac{}。直接返回题目原文，不要解释。'},
             {'type':'image_url','image_url':{'url':f'data:image/jpeg;base64,{img_b64}'}}
         ]}],'max_tokens':800}).encode(),
         headers={'Authorization':f'Bearer {QWEN_KEY}','Content-Type':'application/json'})
@@ -143,18 +148,6 @@ def ocr():
     try: text = describe_image_to_text(p)
     except Exception as e: return {'error':f'VL识别失败: {str(e)}'}
 
-    # 数学公式转 KaTeX 格式
-    try:
-        text = ask_deepseek(f"""你是数学公式排版专家。请将以下题目中的所有数学表达式转为KaTeX格式。规则：
-1. 矩阵、行列式用 $$\\begin{{bmatrix}}...\\end{{bmatrix}}$$
-2. 分数用 $$\\frac{{分子}}{{分母}}$$
-3. 上下标用 ^ 和 _，积分用 $$\\int$$
-4. 一般公式用 $$...$$，行内用 \\(...\\)
-5. 纯中文/非公式文字保持原样
-6. 直接返回转换后的完整题目，不要解释
-
-题目：\n{text}""", max_tokens=800, temperature=0.1)
-    except: pass
     os.makedirs('images', exist_ok=True)
     img_fname = str(uuid.uuid4()) + '.jpg'
     img_path = os.path.join('images', img_fname)
